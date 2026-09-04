@@ -99,6 +99,12 @@ CREATE TABLE vehicle_profile (
 -- predicted_date is copied from what we predicted BEFORE they
 -- tapped done — comparing it to service_date later is how we
 -- measure prediction error.
+--
+-- cost is OPTIONAL (nullable) — the user can skip entering it.
+-- This is the foundation for the future "expense tracking" and
+-- "price comparison" features: once enough users log real costs,
+-- the average cost per service type becomes a benchmark other
+-- users can compare their own quote against.
 -- ------------------------------------------------------------
 CREATE TABLE maintenance_records (
     id                  INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -106,6 +112,7 @@ CREATE TABLE maintenance_records (
     service_date         DATE NOT NULL,
     mileage_at_service  INTEGER,
     predicted_date       DATE,
+    cost                REAL,
     created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (vehicle_id) REFERENCES vehicles(id) ON DELETE CASCADE
 );
