@@ -23,10 +23,10 @@ if pattern_col in row.columns:
  
 row = row[columns]
  
-predicted_speed = model.predict(row)[0]
+predicted_km_per_day = model.predict(row)[0]
  
-days_left = preferred_interval / predicted_speed
+days_left = preferred_interval / predicted_km_per_day
 predicted_date = date.today() + timedelta(days=days_left)
  
-print("estimated usage rate:", round(predicted_speed, 1), "km per day")
+print("estimated usage rate:", round(predicted_km_per_day, 1), "km per day")
 print("predicted maintenance date:", predicted_date)
