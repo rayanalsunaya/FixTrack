@@ -7,11 +7,11 @@
 -- 3. usage_patterns     -> the 8 fixed usage patterns (lookup/reference table)
 -- 4. vehicle_profile    -> one row per vehicle: chosen pattern, preferred
 --                          interval, and the LEARNED usage rate (this is
---                          what the AI model updates over time)
+--                          what the AI model updates over time )
 -- 5. maintenance_records-> every time the user taps "Done"
 -- 6. predictions_log    -> history of predicted-vs-actual dates, used to
 --                          measure how accurate the model becomes over time
---                          (useful for the graduation report's evaluation section)
+--                          
 -- ============================================================
 
 
@@ -71,7 +71,7 @@ CREATE TABLE usage_patterns (
 -- One row per vehicle (UNIQUE vehicle_id). This is the table the
 -- AI logic reads and writes most often:
 --   - usage_pattern_id + preferred_interval_km: set ONCE by the
---     user during onboarding (this was the whole point of your
+--     user during onboarding (this was the whole point of my
 --     "set it once" requirement).
 --   - current_usage_rate: starts as a COPY of the pattern's
 --     estimated_km_per_day, then gets adjusted after every
@@ -103,7 +103,7 @@ CREATE TABLE vehicle_profile (
 -- cost is OPTIONAL (nullable) — the user can skip entering it.
 -- This is the foundation for the future "expense tracking" and
 -- "price comparison" features: once enough users log real costs,
--- the average cost per service type becomes a benchmark other
+-- the average cost per service type becomes a benchmark for other
 -- users can compare their own quote against.
 -- ------------------------------------------------------------
 CREATE TABLE maintenance_records (
@@ -122,8 +122,8 @@ CREATE TABLE maintenance_records (
 -- 6. PREDICTIONS_LOG
 -- Every time the model (re)computes a prediction, we log it here.
 -- actual_date stays NULL until the corresponding "Done" happens.
--- This table is what lets you plot "predicted vs actual" charts
--- in your report to show the model improving over time.
+-- This table is what lets me plot "predicted vs actual" charts
+-- in my report to show the model improving over time.
 -- ------------------------------------------------------------
 CREATE TABLE predictions_log (
     id                  INTEGER PRIMARY KEY AUTOINCREMENT,

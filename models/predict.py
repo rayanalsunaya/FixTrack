@@ -30,3 +30,4 @@ predicted_date = date.today() + timedelta(days=days_left)
  
 print("estimated usage rate:", round(predicted_km_per_day, 1), "km per day")
 print("predicted maintenance date:", predicted_date)
+
