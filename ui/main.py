@@ -101,6 +101,7 @@ def save_to_database(pattern_number, interval):
  
     conn.commit()
     conn.close()
+    return vehicle_id
  
  
 def predict_result(pattern_number, interval):
@@ -125,6 +126,56 @@ def predict_result(pattern_number, interval):
     predicted_date = date.today() + timedelta(days=days_left)
  
     return predicted_km_per_day, predicted_date
+ 
+ 
+def log_prediction(vehicle_id, predicted_date, usage_rate):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO predictions_log (vehicle_id, predicted_date, usage_rate_used) VALUES (?, ?, ?)",
+        (vehicle_id, str(predicted_date), float(usage_rate)),
+    )
+    conn.commit()
+    conn.close()
+ 
+ 
+def save_service(vehicle_id, cost):
+    today = str(date.today())
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+ 
+    # the prediction that was waiting for this service
+    cursor.execute(
+        "SELECT id, predicted_date FROM predictions_log WHERE vehicle_id = ? AND actual_date IS NULL ORDER BY id DESC LIMIT 1",
+        (vehicle_id,),
+    )
+    open_row = cursor.fetchone()
+    old_predicted_date = None
+    if open_row is not None:
+        old_predicted_date = open_row[1]
+        cursor.execute("UPDATE predictions_log SET actual_date = ? WHERE id = ?", (today, open_row[0]))
+ 
+    cursor.execute(
+        "INSERT INTO maintenance_records (vehicle_id, service_date, predicted_date, cost) VALUES (?, ?, ?, ?)",
+        (vehicle_id, today, old_predicted_date, cost),
+    )
+    cursor.execute(
+        "UPDATE vehicle_profile SET last_service_date = ?, updated_at = CURRENT_TIMESTAMP WHERE vehicle_id = ?",
+        (today, vehicle_id),
+    )
+ 
+    cursor.execute(
+        "SELECT usage_pattern_id, preferred_interval_km FROM vehicle_profile WHERE vehicle_id = ?",
+        (vehicle_id,),
+    )
+    pattern_number, interval = cursor.fetchone()
+    conn.commit()
+    conn.close()
+ 
+    # new prediction starts from today
+    usage_rate, new_date = predict_result(pattern_number, interval)
+    log_prediction(vehicle_id, new_date, usage_rate)
+    return usage_rate, new_date
  
  
 def styled_label(text, size=16, bold=False):
@@ -218,10 +269,12 @@ class SetupScreen(Screen):
         pattern_number = patterns.index(self.pattern_spinner.text) + 1
         interval = int(self.interval_input.text)
  
-        save_to_database(pattern_number, interval)
+        vehicle_id = save_to_database(pattern_number, interval)
         usage_rate, predicted_date = predict_result(pattern_number, interval)
+        log_prediction(vehicle_id, predicted_date, usage_rate)
  
         result_screen = self.manager.get_screen("result")
+        result_screen.vehicle_id = vehicle_id
         result_screen.show_result(usage_rate, predicted_date)
         self.manager.current = "result"
  
@@ -229,6 +282,7 @@ class SetupScreen(Screen):
 class ResultScreen(Screen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self.vehicle_id = None
         layout = BoxLayout(orientation="vertical", padding=30, spacing=18)
  
         layout.add_widget(styled_label("Your maintenance prediction", size=20, bold=True))
@@ -239,13 +293,67 @@ class ResultScreen(Screen):
         self.date_label = styled_label("", size=24, bold=True)
         layout.add_widget(self.date_label)
  
+        done_button = styled_button("I did the service")
+        done_button.bind(on_press=self.on_done)
+        layout.add_widget(done_button)
+ 
         layout.add_widget(Label())
  
         self.add_widget(layout)
  
+    def on_done(self, instance):
+        self.manager.get_screen("log").cost_input.text = ""
+        self.manager.get_screen("log").message_label.text = ""
+        self.manager.current = "log"
+ 
     def show_result(self, usage_rate, predicted_date):
         self.rate_label.text = "Estimated usage: " + str(round(usage_rate, 1)) + " km/day"
         self.date_label.text = "Next maintenance: " + str(predicted_date)
+ 
+ 
+class LogScreen(Screen):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        layout = BoxLayout(orientation="vertical", padding=30, spacing=14)
+ 
+        layout.add_widget(styled_label("Log your service", size=20, bold=True))
+        layout.add_widget(styled_label("How much did you pay? (optional)"))
+ 
+        self.cost_input = TextInput(
+            text="", multiline=False, halign="center", input_filter="float",
+            background_color=WHITE, foreground_color=NAVY,
+            size_hint_y=None, height=48
+        )
+        self.cost_input.bind(
+            width=lambda widget, value: setattr(widget, "text_size", (value, None))
+        )
+        layout.add_widget(self.cost_input)
+ 
+        save_button = styled_button("Save")
+        save_button.bind(on_press=self.on_save)
+        layout.add_widget(save_button)
+ 
+        self.message_label = styled_label("", size=14)
+        layout.add_widget(self.message_label)
+ 
+        layout.add_widget(Label())
+ 
+        self.add_widget(layout)
+ 
+    def on_save(self, instance):
+        result_screen = self.manager.get_screen("result")
+ 
+        cost = None
+        if self.cost_input.text != "":
+            try:
+                cost = float(self.cost_input.text)
+            except ValueError:
+                self.message_label.text = "Please enter a valid number"
+                return
+ 
+        usage_rate, new_date = save_service(result_screen.vehicle_id, cost)
+        result_screen.show_result(usage_rate, new_date)
+        self.manager.current = "result"
  
  
 class FixTrackApp(App):
@@ -255,10 +363,13 @@ class FixTrackApp(App):
         sm = ScreenManager()
         sm.add_widget(SetupScreen(name="setup"))
         sm.add_widget(ResultScreen(name="result"))
+        sm.add_widget(LogScreen(name="log"))
         return sm
  
  
-FixTrackApp().run()
+if __name__ == "__main__":
+    FixTrackApp().run()
+
 
 
 
